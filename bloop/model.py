@@ -105,6 +105,7 @@ def _setup_columns(meta):
     # while some list operations uses __eq__ which will break
     # with the ComparisonMixin
     meta.columns = set(filter(_is_column, meta.fields))
+    meta.columns_by_model_name = declare.index(meta.columns, "model_name")
 
     meta.hash_key = None
     meta.range_key = None
@@ -126,9 +127,8 @@ def _setup_indexes(meta):
     # with the ComparisonMixin
     meta.indexes = set(filter(_is_index, meta.fields))
 
-    # Look up the current hash key -- which is specified by
-    # model_name, not dynamo_name -- in indexed columns and relate
-    # the proper `bloop.Column` object
+    # Look up the current hash key (by model_name, not dynamo_name)
+    # in indexed columns and relate the proper `bloop.Column` object
     columns = declare.index(meta.columns, "model_name")
     for index in meta.indexes:
         index.model = meta.model

@@ -1,8 +1,21 @@
+import enum
 import bloop.condition
 import bloop.util
-import collections
+
+
+class ModifyMode(enum.Enum):
+    """
+    Tracking mode for a modification against a given column's name.
+    Almost all updates are `overwrite`.  The most common use of
+    insert_on_missing is for intermediate paths in documents, or for other
+    containers where partial updates are possible.
+    """
+    overwrite = 0
+    insert_on_missing = 1
+
+
 _tracking = bloop.util.WeakDefaultDictionary(
-    lambda: {"marked": set(), "snapshot": None, "synced": False})
+    lambda: {"changes": dict(), "snapshot": None, "synced": False})
 
 
 def clear(obj):
@@ -23,7 +36,7 @@ def mark(obj, column):
     Any marked columns will be pushed (possibly as DELETES) in
     future UpdateItem calls that include the object.
     """
-    _tracking[obj]["marked"].add(column)
+    _tracking[obj]["changes"][column.model_name] = (ModifyMode.overwrite, None)
 
 
 def sync(obj, engine):
@@ -32,11 +45,11 @@ def sync(obj, engine):
     Store the latest snapshot of all marked values."""
     _tracking[obj]["synced"] = True
     snapshot = bloop.condition.Condition()
-    # Only expect values (or lack of a value) for colummns that have
-    # been explicitly set
-    for column in sorted(_tracking[obj]["marked"],
-                         key=lambda col: col.dynamo_name):
-        value = getattr(obj, column.model_name, None)
+    # Local cache for faster lookup
+    column_index = obj.Meta.columns_by_model_name
+    for model_name in sorted(_tracking[obj]["changes"].keys()):
+        column = column_index[model_name]
+        value = getattr(obj, model_name, None)
         # Don't try to dump Nones through the typedef
         if value is not None:
             value = engine._dump(column.typedef, value)
@@ -75,9 +88,10 @@ def get_update(obj):
             }
 
     """
-    diff = collections.defaultdict(list)
+    diff = {"SET": [], "REMOVE": []}
     key = set((obj.Meta.hash_key, obj.Meta.range_key))
-    for column in _tracking[obj]["marked"]:
+    for model_name in _tracking[obj]["changes"]:
+        column = obj.Meta.columns_by_model_name[model_name]
         if column in key:
             continue
         value = getattr(obj, column.model_name, None)
