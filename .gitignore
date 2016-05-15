@@ -57,5 +57,8 @@ target/
 *.sublime-project
 *.sublime-workspace
 
+# PyCharm
+.idea
+
 # Versioning
 .python-version
