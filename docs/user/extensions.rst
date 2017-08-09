@@ -78,7 +78,6 @@ Now, using arrow:
         created_on=now
     )
 
-..
 .. _arrow: http://crsmithdev.com/arrow
 .. _delorean: https://delorean.readthedocs.io/en/latest/
 .. _pendulum: https://pendulum.eustace.io
